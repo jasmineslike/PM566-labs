@@ -1,0 +1,126 @@
+---
+title: "LAB3"
+author: "Lili Xu"
+date: "9/10/2021"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    fig_width: 10
+    fig_height: 10
+    highlight: haddock
+    theme: cosmo
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Lab Description
+
+The objective of the lab is to find the weather station with the highest elevation and look at patterns in the time series of its wind speed and temperature.
+
+## 1. Read in the data
+
+
+```{r download}
+download.file("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz", "met_all.gz", method="libcurl", timeout = 60)
+met <- data.table::fread("met_all.gz")
+```
+
+## 2. Check the dimensions, headers, footers. 
+
+How many columns, rows are there?
+
+
+```{r check}
+dim(met)
+head(met)
+tail(met)
+```
+
+There are 2,377,343 rows and 30 columns in the met dataset.
+
+## 3. Take a look at the variables.
+
+```{r structure}
+str(met)
+```
+
+## 4. Take a closer look at the key variables.
+
+```{r key}
+table(met$year)
+table(met$day)
+table(met$hour)
+summary(met$temp)
+summary(met$elev)
+summary(met$wind.sp)
+
+met[met$elev==9999.0] <- NA
+summary(met$elev)
+
+met <- met[temp>-40]
+met2 <- met[order(temp)]
+head(met2)
+
+```
+
+## 5. Check the data against an external data source.
+
+```{r checkAgainst}
+met <- met[temp>-15]
+met2 <- met[order(temp)]
+head(met2)
+```
+
+## 6. Calculate summary statistics
+
+```{r statistics}
+elev <- met[elev==max(elev)]
+summary(elev)
+
+cor(elev$temp, elev$wind.sp, use="complete")
+
+cor(elev$temp, elev$hour, use="complete")
+
+cor(elev$wind.sp, elev$day, use="complete")
+
+cor(elev$wind.sp, elev$hour, use="complete")
+
+cor(elev$temp, elev$day, use="complete")
+```
+
+
+## 7. Exploratory graphs
+
+```{r graphs, fig.height=9, fig.width=9}
+hist(met$elev, breaks=100)
+
+hist(met$temp)
+
+hist(met$wind.sp)
+
+#### fix with package
+library(dplyr) ### use for function %>%
+library(leaflet)### use for function leaflet
+leaflet(elev) %>%
+  addProviderTiles('OpenStreetMap') %>%
+  addCircles(lat=~lat,lng=~lon, opacity=1, fillOpacity=1, radius=100)
+
+
+
+library(lubridate)
+elev$date <- with(elev, ymd_h(paste(year, month, day, hour, sep= ' ')))
+summary(elev$date)
+
+elev <- elev[order(date)]
+head(elev)
+
+plot(elev$date, elev$temp, type='l')
+
+plot(elev$date, elev$wind.sp, type='l')
+```
+
