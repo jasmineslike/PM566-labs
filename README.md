@@ -1,4 +1,4 @@
-## PM566-Labs
+# PM566-Labs
 
-# Week 3 lab
+## Week 3 lab
 
