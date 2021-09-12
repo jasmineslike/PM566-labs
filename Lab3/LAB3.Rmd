@@ -24,7 +24,6 @@ The objective of the lab is to find the weather station with the highest elevati
 
 ## 1. Read in the data
 
-
 ```{r download}
 # install it only if it is not present
 if(!require(data.table)){
@@ -76,7 +75,8 @@ summary(met$wind.sp)
 met[met$elev==9999.0] <- NA
 summary(met$elev)
 
-### remove the temperature below -40 which is another issue that contains minimum temperature
+### remove the temperature below -40 which is another issue 
+### that contains minimum temperature
 met <- met[temp>-40]
 met2 <- met[order(temp)]
 head(met2)
@@ -103,6 +103,7 @@ We want to pick out the weather station with maximum elevation and examine its w
 
 ```{r statistics}
 elev <- met[elev==max(elev)]
+
 summary(elev)
 
 cor(elev$temp, elev$wind.sp, use="complete")
