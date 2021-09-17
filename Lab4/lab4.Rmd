@@ -1,0 +1,110 @@
+---
+title: "lab4"
+author: "Lili Xu"
+date: "9/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Read in the data
+
+
+```{r }
+
+library(tidyverse)
+library(data.table)
+
+if (!file.exists("met_all.gz"))
+  download.file(
+    url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz",
+    destfile = "met_all.gz",
+    method   = "libcurl",
+    timeout  = 60
+    )
+met <- data.table::fread("met_all.gz")
+
+```
+
+## 2. Prepare the data
+
+
+
+```{r pressure, echo=FALSE}
+# Remove temperatures less than -17C
+met <- met[temp>-17]
+
+# Make sure there are no missing data in the key variables coded as 9999, 999, etc
+met[, range(temp, na.rm = TRUE)]
+met[, range(rh, na.rm = TRUE)]
+met[, range(wind.sp, na.rm = TRUE)]
+met[, range(vis.dist, na.rm = TRUE)]
+met[, range(dew.point, na.rm = TRUE)]
+met[, range(lat, na.rm = TRUE)]
+met[, range(lon, na.rm = TRUE)]
+met[, range(elev, na.rm = TRUE)]
+
+met[elev == 9999.0, elev := NA]
+
+met[,table(is.na(temp))]
+met[,table(is.na(rh))]
+met[,table(is.na(wind.sp))]
+met[,table(is.na(vis.dist))]
+met[,table(is.na(dew.point))]
+met[,table(is.na(lat))]
+met[,table(is.na(lon))]
+met[,table(is.na(elev))]
+
+# Generate a date variable using the functions as.Date() (hint: You will need the following to create a date paste(year, month, day, sep = "-")).
+met[, ymd := as.Date(paste(year, month, day, sep = "-"))]
+
+#Using the data.table::week function, keep the observations of the first week of the month.
+met[,table(week(ymd))]
+
+met <- met[ week(ymd) == 31]
+
+#Compute the mean by station of the variables temp, rh, wind.sp, vis.dist, dew.point, lat, lon, and elev.
+
+met_avg <- met[, .(
+  temp = mean(temp, na.rm = TRUE),
+  rh = mean(rh, na.rm = TRUE),
+  wind.sp = mean(wind.sp,na.rm = TRUE),
+  vis.dist = mean(vis.dist,na.rm = TRUE),
+  dew.point = mean(dew.point,na.rm = TRUE),
+  lat = mean(lat,na.rm = TRUE),
+  lon = mean(lon,na.rm = TRUE),
+  elev = mean(elev,na.rm = TRUE), USAFID
+  
+), by = "USAFID"]
+#Create a region variable for NW, SW, NE, SE based on lon = -98.00 and lat = 39.71 degrees
+
+met_avg[lat >= 39.71 & lon <= -98, region := "Northwest"]
+met_avg[lat < 39.71 & lon <= -98, region := "Southwest"]
+met_avg[lat >= 39.71 & lon > -98, region := "Northeast"]
+met_avg[lat < 39.71 & lon <= -98, region := "Southeast"]
+
+met_avg[, region2 := fifelse(lat >= 39.71 & lon <= -98, region := "Northwest",
+                        fifelse(lat < 39.71 & lon <= -98, region := "Southwest",
+                          fifelse(lat >= 39.71 & lon > -98, region := "Northeast",
+                            fifelse(lat < 39.71 & lon <= -98, region := "Southeast"))))]
+
+met_avg[, table(region, region2, useNA = "always")]
+        
+#Create a categorical variable for elevation as in the lecture slides
+met_avg[, elev_cat := fifelse(elev > 252, "high", "low") ]
+```
+3. Use geom_violin to examine the wind speed and dew point temperature by region
+You saw how to use geom_boxplot in class. Try using geom_violin instead (take a look at the help). (hint: You will need to set the x aesthetic to 1)
+
+Use facets
+Make sure to deal with NA category
+Describe what you observe in the graph
+
+```{r violin-temp}
+ggplot(met_avg, mapping = aes(y = wind.sp, x = 1)) +
+  geom_violin()
+```
+
+
