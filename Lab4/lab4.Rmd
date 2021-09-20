@@ -3,10 +3,11 @@ title: "lab4"
 author: "Lili Xu"
 date: "9/17/2021"
 output:
-  html_document: 
-    keep_md: yes
-editor_options: 
-  chunk_output_type: inline
+  html_document:
+    toc: yes 
+    toc_float: yes 
+    highlight: haddock
+    theme: cosmo
   github_document:
     keep_html: false
     html_preview: false
@@ -17,101 +18,176 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## 1. Read in the data
-
-
-```{r }
-
-library(tidyverse)
+```{r packages}
 library(data.table)
+library(tidyverse)
+library(lubridate)
+library(leaflet)
+library(ggplot2)
+library(ggforce)
+```
 
+```{r data.read,cache=TRUE}
 if (!file.exists("met_all.gz"))
   download.file(
     url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/02_met/met_all.gz",
     destfile = "met_all.gz",
-    method   = "libcurl",
-    timeout  = 60
-    )
+    method = "libcurl",
+    timeout = 60
+  )
 met <- data.table::fread("met_all.gz")
-
 ```
 
 ## 2. Prepare the data
 
-
-
-```{r pressure, echo=FALSE}
+```{r data_prepare}
 # Remove temperatures less than -17C
-met <- met[temp>-17]
+met <- met[temp >= -17]
+summary(met)
 
 # Make sure there are no missing data in the key variables coded as 9999, 999, etc
-met[, range(temp, na.rm = TRUE)]
-met[, range(rh, na.rm = TRUE)]
-met[, range(wind.sp, na.rm = TRUE)]
-met[, range(vis.dist, na.rm = TRUE)]
-met[, range(dew.point, na.rm = TRUE)]
-met[, range(lat, na.rm = TRUE)]
-met[, range(lon, na.rm = TRUE)]
-met[, range(elev, na.rm = TRUE)]
+met[, range(temp)]
+met[, range(rh,na.rm = TRUE)]
+met[, range(wind.sp,na.rm = TRUE)]
+met[, range(vis.dist,na.rm = TRUE)]
+met[, range(dew.point,na.rm = TRUE)]
+met[, range(lat,na.rm = TRUE)]
+met[, range(lon,na.rm = TRUE)]
+met[, range(elev,na.rm = TRUE)]
 
-met[elev == 9999.0, elev := NA]
+met[elev == 9999, elev := NA]
 
-met[,table(is.na(temp))]
-met[,table(is.na(rh))]
-met[,table(is.na(wind.sp))]
-met[,table(is.na(vis.dist))]
-met[,table(is.na(dew.point))]
-met[,table(is.na(lat))]
-met[,table(is.na(lon))]
-met[,table(is.na(elev))]
+#met[,table(is.na(temp))]
+#met[,table(is.na(rh))]
+#met[,table(is.na(wind.sp))]
+#met[,table(is.na(vis.dist))]
+#met[,table(is.na(dew.point))]
+#met[,table(is.na(lat))]
+#met[,table(is.na(lon))]
+#met[,table(is.na(elev))]
 
 # Generate a date variable using the functions as.Date() (hint: You will need the following to create a date paste(year, month, day, sep = "-")).
 met[, ymd := as.Date(paste(year, month, day, sep = "-"))]
 
-#Using the data.table::week function, keep the observations of the first week of the month.
+# Using the data.table::week function, keep the observations of the first week of the month.
 met[,table(week(ymd))]
+met <- met[week(ymd) == 31]
 
-met <- met[ week(ymd) == 31]
-
-#Compute the mean by station of the variables temp, rh, wind.sp, vis.dist, dew.point, lat, lon, and elev.
-
+# Compute the mean by station of the variables temp, rh, wind.sp, vis.dist, dew.point, lat, lon, and elev.
 met_avg <- met[, .(
-  temp = mean(temp, na.rm = TRUE),
-  rh = mean(rh, na.rm = TRUE),
-  wind.sp = mean(wind.sp,na.rm = TRUE),
-  vis.dist = mean(vis.dist,na.rm = TRUE),
-  dew.point = mean(dew.point,na.rm = TRUE),
-  lat = mean(lat,na.rm = TRUE),
-  lon = mean(lon,na.rm = TRUE),
-  elev = mean(elev,na.rm = TRUE), USAFID
-  
+  temp      = mean(temp, na.rm =TRUE),
+  rh        = mean(rh, na.rm =TRUE),
+  wind.sp   = mean(wind.sp, na.rm =TRUE),
+  vis.dist  = mean(vis.dist, na.rm =TRUE),
+  dew.point = mean(dew.point, na.rm =TRUE),
+  lat       = mean(lat, na.rm =TRUE),
+  lon       = mean(lon, na.rm =TRUE),
+  elev      = mean(elev, na.rm =TRUE), USAFID
 ), by = "USAFID"]
-#Create a region variable for NW, SW, NE, SE based on lon = -98.00 and lat = 39.71 degrees
 
-met_avg[lat >= 39.71 & lon <= -98, region := "Northwest"]
-met_avg[lat < 39.71 & lon <= -98, region := "Southwest"]
-met_avg[lat >= 39.71 & lon > -98, region := "Northeast"]
-met_avg[lat < 39.71 & lon <= -98, region := "Southeast"]
+# Create a region variable for NW, SW, NE, SE based on lon = -98.00 and lat = 39.71 degrees
+met_avg[lat >= 39.71 & lon <= -98, region:="Northwest"]
+met_avg[lat <39.71 & lon <= -98, region:="Southwest"]
+met_avg[lat >= 39.71 & lon > -98, region:="Northeast"]
+met_avg[lat < 39.71 & lon > -98,region:="Southeast"]
+met_avg[, table(region, useNA = "always")]
 
-met_avg[, region2 := fifelse(lat >= 39.71 & lon <= -98, region := "Northwest",
-                        fifelse(lat < 39.71 & lon <= -98, region := "Southwest",
-                          fifelse(lat >= 39.71 & lon > -98, region := "Northeast",
-                            fifelse(lat < 39.71 & lon <= -98, region := "Southeast"))))]
+met_avg[, region2 := fifelse(lat >= 39.71 & lon <= -98, "Northwest",
+                      fifelse(lat < 39.71  & lon <= -98, "Southwest",
+                        fifelse(lat >= 39.71 & lon > -98, "Northeast",
+                          fifelse(lat < 39.71  & lon > -98, "Southeast", NA_character_))))]
 
 met_avg[, table(region, region2, useNA = "always")]
-        
-#Create a categorical variable for elevation as in the lecture slides
-met_avg[, elev_cat := fifelse(elev > 252, "high", "low") ]
-```
-3. Use geom_violin to examine the wind speed and dew point temperature by region
-You saw how to use geom_boxplot in class. Try using geom_violin instead (take a look at the help). (hint: You will need to set the x aesthetic to 1)
 
-Use facets
-Make sure to deal with NA category
-Describe what you observe in the graph
+# Create a categorical variable for elevation as in the lecture slides
+met_avg[, elev_cat := fifelse(elev > 252, "high", "low")]
 
-```{r violin-temp}
-ggplot(met_avg, mapping = aes(y = wind.sp, x = 1)) +
-  geom_violin()
+# Deleting extra column---USAFID
+met_avg <- met_avg[, -1]
 ```
 
+## 3. Use geom_violin to examine the wind speed and dew point temperature by region
 
+### Wind speed
+
+The wind speed is lower in the eastern region and higher wind speed in the western region.
+```{r violin-wind, cache=TRUE}
+ggplot(met_avg, mapping = aes(y = wind.sp, x = 1)) + 
+  geom_violin() +
+  facet_grid(~region)
+```
+
+### Dew point
+From the plot, it seems western region has the highest and lowest dew point at the same time.
+```{r violin-dew, cache=TRUE}
+ggplot(met_avg, mapping = aes(y = dew.point, x = 1)) + 
+  geom_violin() +
+  facet_grid(~region)
+```
+
+## 4.Use geom_jitter with stat_smooth to examine the association between dew point temperature and wind speed by region
+
+According to the inclination angle of the slope, it can be concluded that the wind speed and dew points of the northeast, northwest, and southwest regions are positive. But the slope of the southeast region is almost 0, indicating that the wind speed and the dew point have nothing related.
+
+```{r geom_jitter, cache=TRUE}
+met_avg[!is.na(dew.point) & !is.na(wind.sp)] %>% 
+  ggplot(mapping=aes(x=dew.point, y = wind.sp, color=region, linetype=region)) + 
+  geom_jitter() +
+  stat_smooth(method=lm, se=FALSE, color="blue")
+```
+
+## 5.Use geom_bar to create barplots of the weather stations by elevation category coloured by region
+
+Base on the barplot, It seems Southeast has the most Weather stations in the low elevation, and Northwest has the lowest weather station in low elevation.
+Within high elevation, the Northeast has the most stations, and the Northwest has the lowest stations, but it seems more Average.
+```{r barplot, cache=TRUE}
+met_avg[!is.na(elev_cat)] %>% 
+  ggplot(mapping=aes(x=elev_cat, fill=region)) + 
+  geom_bar(position="dodge") +
+  labs(title = "Number of Weather Stations by Elevation Category(Coloured by region)", x  = "Elevation Category", y = "Number of Weather Stations")+
+  scale_fill_brewer(palette = "RdPu")
+```
+
+## 6.Use stat_summary to examine mean dew point and wind speed by region with standard deviation error bars
+
+### Mean wind speed
+The mean wind speed of Northeast and Southeast is on the range 1.5 ~ 2.0, and the Northwest is very closed to 3.0, and the Southwest is more closed to 3.1.
+```{r summ_wind, cache=TRUE}
+ggplot(met_avg[!is.na(wind.sp) & !is.na(dew.point)], mapping = aes(x=region, y = wind.sp)) +
+  stat_summary(fun.data="mean_sdl") +
+  stat_summary(fun.data="mean_sdl", geom="errorbar")
+```
+
+### Mean dew point
+The mean dew point temperature of Northeast is on the range 15 ~ 17, the Northwest is very closed to 12.5, the Southeast is on th range 20 ~ 22 and the Southwest is very closed to 13.
+```{r summ_dew, cache=TRUE}
+ggplot(met_avg[!is.na(wind.sp) & !is.na(dew.point)], mapping = aes(x=region, y = dew.point)) +
+  stat_summary(fun.data="mean_sdl") +
+  stat_summary(fun.data="mean_sdl", geom="errorbar")
+```
+
+## 7.Make a map showing the spatial trend in relative h in the US
+It seems relative humidity temperature ¥ increased when moved from westen to eastern region.
+```{r leaflet, cache=TRUE}
+met_avg2 <- met_avg[!is.na(rh)]
+temp.pal <- colorNumeric(c('darkgreen','goldenrod','brown'), domain=met_avg2$rh)
+leaflet(met_avg2) %>%
+  addProviderTiles('CartoDB.Positron') %>%
+  addCircles(
+    lat = ~lat, lng=~lon,
+    label = ~paste0(round(rh,2), ' rh'), color = ~ temp.pal(rh),
+    opacity = 1, fillOpacity = 1, radius = 500
+    ) %>%
+  # And a Markers
+  addMarkers(lat = ~met_avg2[rank(-rh) <= 10, lat], lng = ~met_avg2[rank(-rh) <= 10, lon]) %>%
+  # And a pretty legend
+  addLegend('bottomleft', pal=temp.pal, values=met_avg2$rh,
+          title='Temperature, C', opacity=1)
+```
+
+## 8.Use a ggplot extension: ggforce
+```{r ggforce, cache=TRUE}
+ggplot(met_avg, aes(wind.sp, dew.point, colour = region)) +
+  geom_point() +
+  facet_zoom(y = region == "Northwest")
+```
