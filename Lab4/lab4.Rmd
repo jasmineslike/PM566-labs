@@ -2,7 +2,14 @@
 title: "lab4"
 author: "Lili Xu"
 date: "9/17/2021"
-output: html_document
+output:
+  html_document: 
+    keep_md: yes
+editor_options: 
+  chunk_output_type: inline
+  github_document:
+    keep_html: false
+    html_preview: false
 ---
 
 ```{r setup, include=FALSE}
