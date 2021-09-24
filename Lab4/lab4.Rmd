@@ -11,6 +11,7 @@ output:
   github_document:
     keep_html: false
     html_preview: false
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -169,20 +170,25 @@ ggplot(met_avg[!is.na(wind.sp) & !is.na(dew.point)], mapping = aes(x=region, y =
 ## 7.Make a map showing the spatial trend in relative h in the US
 It seems relative humidity temperature ¥ increased when moved from westen to eastern region.
 ```{r leaflet, cache=TRUE}
-met_avg2 <- met_avg[!is.na(rh)]
-temp.pal <- colorNumeric(c('darkgreen','goldenrod','brown'), domain=met_avg2$rh)
-leaflet(met_avg2) %>%
-  addProviderTiles('CartoDB.Positron') %>%
-  addCircles(
-    lat = ~lat, lng=~lon,
-    label = ~paste0(round(rh,2), ' rh'), color = ~ temp.pal(rh),
-    opacity = 1, fillOpacity = 1, radius = 500
-    ) %>%
-  # And a Markers
-  addMarkers(lat = ~met_avg2[rank(-rh) <= 10, lat], lng = ~met_avg2[rank(-rh) <= 10, lon]) %>%
-  # And a pretty legend
-  addLegend('bottomleft', pal=temp.pal, values=met_avg2$rh,
-          title='Temperature, C', opacity=1)
+if(knitr::is_html_output()){
+
+  met_avg2 <- met_avg[!is.na(rh)]
+  temp.pal <- colorNumeric(c('darkgreen','goldenrod','brown'), domain=met_avg2$rh)
+  leaflet(met_avg2) %>%
+    addProviderTiles('CartoDB.Positron') %>%
+    addCircles(
+      lat = ~lat, lng=~lon,
+      label = ~paste0(round(rh,2), ' rh'), color = ~ temp.pal(rh),
+      opacity = 1, fillOpacity = 1, radius = 500
+      ) %>%
+    # And a Markers
+    addMarkers(lat = ~met_avg2[rank(-rh) <= 10, lat], lng = ~met_avg2[rank(-rh) <= 10, lon]) %>%
+    # And a pretty legend
+    addLegend('bottomleft', pal=temp.pal, values=met_avg2$rh,
+            title='Temperature, C', opacity=1)
+}else{
+  message("Sorry! No HTML!")
+}
 ```
 
 ## 8.Use a ggplot extension: ggforce

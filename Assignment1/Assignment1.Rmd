@@ -12,6 +12,7 @@ output:
     github_document:
       keep_html: false
       html_preview: false
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -163,10 +164,8 @@ Mean_2019<-ddply(PM2019,.(COUNTY,Year),summarize,mean_AQI=mean(DAILY_AQI_VALUE))
 str(Mean_2019)
 
 Pm2.5_Mean_AQI <- rbind(Mean_2004,Mean_2019)
-# ???
-#Pm2.5_Mean_AQI[!is.na(mean_AQI)]
 
-ggplot(Pm2.5_Mean_AQI, aes(x=COUNTY, y=mean_AQI, group=Year)) +
+ggplot(Pm2.5_Mean_AQI[!is.na("mean_AQI")], aes(x=COUNTY, y=mean_AQI, group=Year)) +
   geom_line(aes(color=Year))+
   geom_point(aes(color=Year))+
   labs(title = "Mean AQI Value in Different County in the California by Year ", x  = "County Name", y = " Mean AQI Value")+
@@ -184,7 +183,7 @@ For the relationship between AQI and county in California, we need to get the me
 
 LA_AQI <- filter(PM2.5_Combine, COUNTY == "Los Angeles")
 ggplot( 
-  LA_AQI,
+  LA_AQI[!is.na("AQI")],
   mapping = aes(x = `Site Name`, y = AQI, fill = Year)) +
   geom_boxplot() +
   labs(title = 'Boxplot of AQI in LA site by Year', x = 'Site Name')+
