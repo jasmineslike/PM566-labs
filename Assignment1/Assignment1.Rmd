@@ -1,0 +1,195 @@
+---
+title: "Assignment1"
+author: "Lili Xu"
+date: "9/23/2021"
+output: 
+    html_document:
+      toc: yes 
+      toc_float: yes 
+      highlight: haddock
+      theme: cosmo
+      keep_md: yes
+    github_document:
+      keep_html: false
+      html_preview: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Step 1: 
+Given the formulated question from the assignment description, you will now conduct EDA Checklist items 2-4. First, download 2004 and 2019 data for all sites in California from the EPA Air Quality Data website.
+
+```{r packages}
+library(data.table)
+library(tidyverse)
+library(lubridate)
+library(leaflet)
+library(plyr)
+library(dplyr)
+library(ggforce)
+```
+
+### Read Data
+Read in the data using data.table().
+
+```{r read data}
+PM2004 <- data.table::fread("~/Desktop/PM566/PM566-labs/Assignment1/2004PM2.5.csv")
+PM2019 <- data.table::fread("~/Desktop/PM566/PM566-labs/Assignment1/2019PM2.5.csv")
+```
+
+### Check 2004 Data
+Check the dimensions, headers, footers, variable names and variable types. Check for any data issues, particularly in the key variable we are analyzing.
+```{r check data 2004}
+# 2004 
+dim(PM2004) 
+head(PM2004)
+tail(PM2004)
+names(PM2004)
+str(PM2004)
+
+summary(PM2004$`Daily Mean PM2.5 Concentration`)
+summary(PM2004$DAILY_AQI_VALUE)
+
+```
+1. There are 19233 rows and 20 columns in the PM2.5_2004 dataset.
+2. The maximum of Daily Mean PM2.5 Concentration is 251.00. The mean is 13.13, and the median is 10.10. So, in 2004, PM 2.5 is not too seriously, with the latest PM 2.5 range (0 ~ 12: good).
+3. The U.S. AQI is EPA’s index for reporting air quality. With the AQI value table on the [Air Quality Index (AQI) Basics](https://www.airnow.gov/aqi/aqi-basics/):
+    * the maximum of AQI is 301 ---- Hazardous (Health warning of emergency conditions: everyone is more likely to be affected.)
+    * the mean of AQI is 46.34 ---- Good(Air quality is satisfactory, and air pollution poses little or no risk.)
+    * the Median of AQI is 42.00 ---- Good(Air quality is satisfactory, and air pollution poses little or no risk.)
+    * which seems the AQI level of 2004 is not too bad, most time is good.
+
+### Check 2019 Data
+Check the dimensions, headers, footers, variable names and variable types. Check for any data issues, particularly in the key variable we are analyzing.
+```{r check data 2019}
+# 2019
+dim(PM2019)
+head(PM2019)
+tail(PM2019)
+names(PM2019)
+str(PM2019)
+
+summary(PM2019$`Daily Mean PM2.5 Concentration`)
+summary(PM2019$DAILY_AQI_VALUE)
+```
+
+1. There are 53086 rows and 20 columns in the PM2.5_2019 dataset.
+2. The maximum of Daily Mean PM2.5 Concentration is 120.900 The mean is 7.78, and the median is 6.500 So, in 2019, PM 2.5 is much better than 2004, with the latest PM 2.5 range (0 ~ 12: good).
+3. The U.S. AQI is EPA’s index for reporting air quality. With the AQI value table on the [Air Quality Index (AQI) Basics](https://www.airnow.gov/aqi/aqi-basics/):
+    * the maximum of AQI is 185.00 ---- Unhealthy (Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.)
+    * the mean of AQI is 30.72 ---- Good(Air quality is satisfactory, and air pollution poses little or no risk.)
+    * the Median of AQI is 27.00 ---- Good(Air quality is satisfactory, and air pollution poses little or no risk.)
+    * which seems the AQI level of 2019 is more healthy than 2004, the level of maxium is much lower.
+
+
+## Step 2: 
+Combine the two years of data into one data frame. Use the Date variable to create a new column for year, which will serve as an identifier. Change the names of the key variables so that they are easier to refer to in your code.
+
+```{r Combine Data}
+PM2004[, Year := "2004"]
+str(PM2004)
+PM2019[, Year := "2019"]
+str(PM2019)
+
+PM2.5_Combine <- rbind(PM2004,PM2019)
+str(PM2.5_Combine)
+table(PM2.5_Combine$Year)
+
+colnames(PM2.5_Combine)[5] <- "PM2.5"
+colnames(PM2.5_Combine)[7] <- "AQI"
+colnames(PM2.5_Combine)[19] <- "lat"
+colnames(PM2.5_Combine)[20] <- "lon"
+```
+
+## Step 3: 
+Create a basic map in leaflet() that shows the locations of the sites (make sure to use different colors for each year). Summarize the spatial distribution of the monitoring sites.
+
+```{r map}
+
+year.pal <- colorFactor(c("pink","lightgreen"), domain=PM2.5_Combine$Year)
+leaflet(PM2.5_Combine) %>%
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircleMarkers(lat=~lat,lng=~lon, opacity=1, fillOpacity=1, radius=1,color = ~year.pal(PM2.5_Combine$Year))
+```
+
+## Step 4: 
+Check for any missing or implausible values of PM in the combined dataset. Explore the proportions of each and provide a summary of any temporal patterns you see in these observations.
+
+```{r implausible values}
+summary(PM2.5_Combine$PM2.5)
+# Base online survey, PM 2.5 range: 0-12 which is good, so I need to remove all data under 0.
+dim(PM2.5_Combine[PM2.5<=0])[1]/dim(PM2.5_Combine)[1]
+PM2.5_Combine <- PM2.5_Combine[PM2.5>=0]
+summary(PM2.5_Combine$PM2.5)
+
+summary(PM2.5_Combine$AQI)
+
+dim(PM2.5_Combine[is.na(PM2.5)])
+dim(PM2.5_Combine[is.na(AQI)])
+
+summary(PM2.5_Combine$lat)
+summary(PM2.5_Combine$lon)
+
+dim(PM2.5_Combine[is.na(Date)])
+dim(PM2.5_Combine[is.na(`Site Name`)])
+
+```
+Based on the first summary, it is obviously that Pm2.5 combine data contains negative values, but base the [Revised PM2.5 AQI breakpoints](https://aqicn.org/faq/2013-09-09/revised-pm25-aqi-breakpoints/), the value must larger than 0. With the original data, the proportion of error data is 0.503%. There is no missing values in the key variables. As the summary of AQI, it seems more healthy, the data is around the median 30.00 which is lower than standard.
+
+## Step 5: 
+Explore the main question of interest at three different spatial levels. Create exploratory plots (e.g. boxplots, histograms, line plots) and summary statistics that best suit each level of data. Be sure to write up explanations of what you observe in these data.
+
+### State
+
+Reference: [facet_zoom](https://rdrr.io/cran/ggforce/man/facet_zoom.html)
+```{r state}
+ggplot(PM2.5_Combine[!is.na(PM2.5)],  aes(x=PM2.5, fill=Year, color=Year)) +
+  geom_histogram()+
+  labs(title = "Histograms of the Concentration of PM2.5 in California State ", x = "concentration")+
+  facet_zoom(x = PM2.5 <50)
+
+```
+
+It is obviously from Historgram plot that the Concentration of PM2.5 in 2019 much lower than 2004 in California.
+
+### County
+
+Reference: [facet_wrap](https://ggplot2-book.org/facet.html)
+```{r county}
+Mean_2004<-ddply(PM2004,.(COUNTY,Year),summarize,mean_AQI=mean(DAILY_AQI_VALUE))
+str(Mean_2004)
+Mean_2019<-ddply(PM2019,.(COUNTY,Year),summarize,mean_AQI=mean(DAILY_AQI_VALUE))
+str(Mean_2019)
+
+Pm2.5_Mean_AQI <- rbind(Mean_2004,Mean_2019)
+# ???
+#Pm2.5_Mean_AQI[!is.na(mean_AQI)]
+
+ggplot(Pm2.5_Mean_AQI, aes(x=COUNTY, y=mean_AQI, group=Year)) +
+  geom_line(aes(color=Year))+
+  geom_point(aes(color=Year))+
+  labs(title = "Mean AQI Value in Different County in the California by Year ", x  = "County Name", y = " Mean AQI Value")+
+  theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1))+
+  facet_wrap(~Year, scales = "free_y", ncol = 1)
+
+```
+
+For the relationship between AQI and county in California, we need to get the mean AQI value first which allow us to draw the line plot. The Above line plots show the AQI level in 2019 counties is better than the level in 2004, since the maximum of 2004 is around 60, the maximum of 2019 is around 50. El Dorado, Lake are the lowest AQI level in 2019 counties, Contra Costa, El Dorado, Siskiyou, Trinity are the lowest counties(AQI) in 2004
+
+### Site in Los Angeles
+
+```{r site in los angeles}
+
+LA_AQI <- filter(PM2.5_Combine, COUNTY == "Los Angeles")
+ggplot( 
+  LA_AQI,
+  mapping = aes(x = `Site Name`, y = AQI, fill = Year)) +
+  geom_boxplot() +
+  labs(title = 'Boxplot of AQI in LA site by Year', x = 'Site Name')+
+  theme(text = element_text(size=10),
+        axis.text.x = element_text(angle=90, hjust=1))
+```
+
+Excluding the missing data, it is clearly show the information that the AQI level in 2019 site Los Angeles is better than 2004, the red boxes and their means are higher than blue boxes and their means.
