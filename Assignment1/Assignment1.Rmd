@@ -18,7 +18,7 @@ always_allow_html: true
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Step 1: 
+## Step 1: Prepare and Check Data
 Given the formulated question from the assignment description, you will now conduct EDA Checklist items 2-4. First, download 2004 and 2019 data for all sites in California from the EPA Air Quality Data website.
 
 ```{r packages}
@@ -40,6 +40,7 @@ PM2019 <- data.table::fread("~/Desktop/PM566/PM566-labs/Assignment1/2019PM2.5.cs
 ```
 
 ### Check 2004 Data
+
 Check the dimensions, headers, footers, variable names and variable types. Check for any data issues, particularly in the key variable we are analyzing.
 ```{r check data 2004}
 # 2004 
@@ -84,7 +85,7 @@ summary(PM2019$DAILY_AQI_VALUE)
     * which seems the AQI level of 2019 is more healthy than 2004, the level of maxium is much lower.
 
 
-## Step 2: 
+## Step 2: Combine 2004 and 2019 Dataset
 Combine the two years of data into one data frame. Use the Date variable to create a new column for year, which will serve as an identifier. Change the names of the key variables so that they are easier to refer to in your code.
 
 ```{r Combine Data}
@@ -103,7 +104,7 @@ colnames(PM2.5_Combine)[19] <- "lat"
 colnames(PM2.5_Combine)[20] <- "lon"
 ```
 
-## Step 3: 
+## Step 3: Map for locations of the sites
 Create a basic map in leaflet() that shows the locations of the sites (make sure to use different colors for each year). Summarize the spatial distribution of the monitoring sites.
 
 ```{r map}
@@ -114,7 +115,9 @@ leaflet(PM2.5_Combine) %>%
   addCircleMarkers(lat=~lat,lng=~lon, opacity=1, fillOpacity=1, radius=1,color = ~year.pal(PM2.5_Combine$Year))
 ```
 
-## Step 4: 
+According to the map information, we can conclude that most of these locations are concentrated in two cities: Los Angeles and San Francisco. At the same time, it is obvious that there are many more coastal locations than inland, no matter what year it is.
+
+## Step 4: Check Missing data
 Check for any missing or implausible values of PM in the combined dataset. Explore the proportions of each and provide a summary of any temporal patterns you see in these observations.
 
 ```{r implausible values}
@@ -138,7 +141,7 @@ dim(PM2.5_Combine[is.na(`Site Name`)])
 ```
 Based on the first summary, it is obviously that Pm2.5 combine data contains negative values, but base the [Revised PM2.5 AQI breakpoints](https://aqicn.org/faq/2013-09-09/revised-pm25-aqi-breakpoints/), the value must larger than 0. With the original data, the proportion of error data is 0.503%. There is no missing values in the key variables. As the summary of AQI, it seems more healthy, the data is around the median 30.00 which is lower than standard.
 
-## Step 5: 
+## Step 5: Plots
 Explore the main question of interest at three different spatial levels. Create exploratory plots (e.g. boxplots, histograms, line plots) and summary statistics that best suit each level of data. Be sure to write up explanations of what you observe in these data.
 
 ### State
