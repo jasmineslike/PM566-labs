@@ -89,23 +89,56 @@ station_average <- met[,.(
   temp = mean(temp, na.rm=TRUE),
   wind.sp = mean(wind.sp, na.rm=TRUE),
   atm.press = mean(atm.press, na.rm=TRUE)
-), by = USAFID]
+), by = .(USAFID)]
 ```
 
-Now, we need to identify the median per variable
+Now, we need to identify the median per variable.
 ```{r quantiles}
-station_average[,.(
+medians <- station_average[,.(
   temp_50 = quantile(temp, probs = .5, na.rm = TRUE),
   wind.sp_50 = quantile(wind.sp, probs = .5, na.rm = TRUE),
   atm.press_50 = quantile(atm.press, probs = .5, na.rm = TRUE)
 )]
 ```
+Now, we can find the stations that are the closest to these. (hint: `which.min()`)
+
+```{r median-temp}
+station_average[, temp_dist := abs(temp - medians$temp_50)]
+median_temp_station <- station_average[order(temp_dist)][1] 
+median_temp_station
+```
+
+The median temperature station is `r median_temp_station$USAFID`.
+
 
 ## Question 2: Representative station per state
 
 Just like the previous question, you are asked to identify what is the most representative, the median, station per state. This time, instead of looking at one variable at a time, look at the euclidean distance. If multiple stations show in the median, select the one located at the lowest latitude.
-```{r}
 
+We fisrt need to recover the statevariable, be mergeing :)!
+```{r}
+station_average <- merge(
+  x = station_average, y = stations, 
+  by.x  = "USAFID",
+  by.y  = "USAF", 
+  all.x = TRUE, all.y = FALSE
+  )
+```
+
+Now we can comoute the median per state
+```{r}
+station_average[, temp_50 := quantile(temp, probs = .5, na.rm = TRUE), by = STATE]
+station_average[, wind.sp_50 := quantile(wind.sp, probs = .5, na.rm = TRUE), by = STATE]
+```
+
+Now, the euclidean distance ... $\sqrt{\sum_i(x_i - y_i)^2}$
+
+```{r}
+station_average[, eudist := sqrt(
+  (temp - temp_50)^2 + (wind.sp - wind.sp_50)^2
+  )]
+# station_average
+knitr::kable(station_average)
 ```
 
 ## Question 3: In the middle?
@@ -133,6 +166,26 @@ Once you are done with that, you can compute the following:
     
 All by the levels described before.
 ```{r}
+met[, state_temp := mean(temp, na.rm = TRUE), by = STATE]
+met[, temp_cat := fifelse(
+  state_temp < 20, "low-temp",
+  fifelse(state_temp < 25, "mid-temp", "high-temp"))]
+```
 
+Lets make sure that we don't have NAs
+```{r}
+table(met$temp_cat, useNA = "always")
+```
+
+Now, let's summarize
+
+```{r}
+tab <- met[, .(
+  N_entries = .N,
+  N_stations = length(unique(USAFID)),
+  N_states = .N
+), by = temp_cat]
+
+knitr::kable(tab)
 ```
 
