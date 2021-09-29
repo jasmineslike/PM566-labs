@@ -27,9 +27,6 @@ library(data.table)
 library(tidyverse)
 library(lubridate)
 library(leaflet)
-library(plyr)
-library(dplyr)
-library(ggforce)
 ```
 
 ```{r stations-data,cache=TRUE}
@@ -88,7 +85,9 @@ First, generate a representative version of each station. We will use the averag
 station_average <- met[,.(
   temp = mean(temp, na.rm=TRUE),
   wind.sp = mean(wind.sp, na.rm=TRUE),
-  atm.press = mean(atm.press, na.rm=TRUE)
+  atm.press = mean(atm.press, na.rm=TRUE),
+  lon = mean(lon, na.rm = TRUE),
+  lat = mean(lat, na.rm = TRUE)
 ), by = .(USAFID)]
 ```
 
@@ -105,47 +104,109 @@ Now, we can find the stations that are the closest to these. (hint: `which.min()
 ```{r median-temp}
 station_average[, temp_dist := abs(temp - medians$temp_50)]
 median_temp_station <- station_average[order(temp_dist)][1] 
-median_temp_station
+
+knitr::kable(median_temp_station)
 ```
 
 The median temperature station is `r median_temp_station$USAFID`.
+
+```{r median-wind.sp}
+station_average[, wind.sp_dist := abs(wind.sp - medians$wind.sp_50)]
+median_wind.sp_station <- station_average[order(wind.sp_dist)][1] 
+
+knitr::kable(median_wind.sp_station)
+```
+
+The median wind speed station is `r median_wind.sp_station$USAFID`.
+
+```{r median-atm.press}
+station_average[, atm.press_dist := abs(atm.press - medians$atm.press_50)]
+median_atm.press_station <- station_average[order(atm.press_dist)][1] 
+
+knitr::kable(median_atm.press_station)
+```
+
+The median atmospheric pressure station is `r median_atm.press_station$USAFID`.
+
+These stations of temperature, wind.speed, atmospheric pressure are not coincide.
 
 
 ## Question 2: Representative station per state
 
 Just like the previous question, you are asked to identify what is the most representative, the median, station per state. This time, instead of looking at one variable at a time, look at the euclidean distance. If multiple stations show in the median, select the one located at the lowest latitude.
 
-We fisrt need to recover the statevariable, be mergeing :)!
-```{r}
+We first need to recover the state variable, be merging :)!
+```{r merging-avg}
 station_average <- merge(
   x = station_average, y = stations, 
   by.x  = "USAFID",
   by.y  = "USAF", 
   all.x = TRUE, all.y = FALSE
   )
+
+station_average <- station_average[,.(
+  temp = mean(temp, na.rm=TRUE),
+  wind.sp = mean(wind.sp, na.rm=TRUE),
+  atm.press = mean(atm.press, na.rm=TRUE),
+  lon = mean(lon, na.rm = TRUE),
+  lat = mean(lat, na.rm = TRUE),
+  STATE = STATE
+), by = .(USAFID)]
 ```
 
-Now we can comoute the median per state
-```{r}
+Now we can compute the median per state
+```{r quantiles2}
 station_average[, temp_50 := quantile(temp, probs = .5, na.rm = TRUE), by = STATE]
 station_average[, wind.sp_50 := quantile(wind.sp, probs = .5, na.rm = TRUE), by = STATE]
+station_average[, atm.press_50 := quantile(atm.press, probs = .5, na.rm = TRUE), by = STATE]
+
 ```
 
 Now, the euclidean distance ... $\sqrt{\sum_i(x_i - y_i)^2}$
 
-```{r}
+```{r eucliden}
 station_average[, eudist := sqrt(
-  (temp - temp_50)^2 + (wind.sp - wind.sp_50)^2
+  (temp - temp_50)^2 + (wind.sp - wind.sp_50)^2 + (atm.press - atm.press_50)^2
   )]
+
+station_state <- station_average[ , .SD[which.min(eudist)], by = STATE]
+
 # station_average
-knitr::kable(station_average)
+knitr::kable(station_state)
 ```
+
+This above table shows the most representative, the median, station per state at the lowest latitude.
 
 ## Question 3: In the middle?
 For each state, identify what is the station that is closest to the mid-point of the state. Combining these with the stations you identified in the previous question, use leaflet() to visualize all ~100 points in the same figure, applying different colors for those identified in this question.
 
-```{r}
+```{r leaflet}
+# Compute the median per state for lon and lat
+station_average[, lat_50 := quantile(lat, probs = .5, na.rm = TRUE), by = STATE]
+station_average[, lon_50 := quantile(lon, probs = .5, na.rm = TRUE), by = STATE]
 
+# Now, the euclidean distance ... $\sqrt{\sum_i(x_i - y_i)^2}$
+station_average[, latlon_eudist := sqrt(
+  (lat - lat_50)^2 + (lon - lon_50)^2
+  )]
+
+# get the minmium state center
+mid_point_state <- station_average[ , .SD[which.min(latlon_eudist)], by = STATE]
+knitr::kable(mid_point_state)
+
+# combine two states datasets
+station_state[, type := "Center of the temperature, wind speed, atmospheric pressure"]
+mid_point_state[, type := "Center of the State"]
+center_states <- rbind(station_state, mid_point_state, fill = TRUE)
+
+# Draw the map
+leaflet(center_states) %>%
+  addProviderTiles("OpenStreetMap") %>%
+  addCircles(
+    lat = ~lat, lng = ~lon, 
+    color=~ifelse(type=="Center of the State",'pink','lightgreen'), 
+    opacity=1,fillOpacity=0.7, radius=100
+    )
 ```
 
 ## Question 4: Means of means
@@ -167,6 +228,8 @@ Once you are done with that, you can compute the following:
 All by the levels described before.
 ```{r}
 met[, state_temp := mean(temp, na.rm = TRUE), by = STATE]
+met[, state_wind.sp := mean(wind.sp, na.rm = TRUE),by = STATE]
+met[, state_atm.press := mean(atm.press, na.rm = TRUE),by = STATE]
 met[, temp_cat := fifelse(
   state_temp < 20, "low-temp",
   fifelse(state_temp < 25, "mid-temp", "high-temp"))]
@@ -183,7 +246,9 @@ Now, let's summarize
 tab <- met[, .(
   N_entries = .N,
   N_stations = length(unique(USAFID)),
-  N_states = .N
+  avg_temp = mean(state_temp),
+  avg_wind.sp = mean(state_wind.sp),
+  avg_atm.press = mean(state_atm.press)
 ), by = temp_cat]
 
 knitr::kable(tab)
