@@ -1,0 +1,115 @@
+---
+title: "Lab6"
+author: "Lili Xu"
+date: "10/1/2021"
+output: 
+    html_document:
+      toc: yes 
+      toc_float: yes 
+      highlight: haddock
+      theme: cosmo
+      keep_md: yes
+    github_document:
+      keep_html: false
+      html_preview: false
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Download the Dataset
+
+```{r pacakage}
+library(tidyverse)
+library(tibble)
+library(dplyr)
+library(ggplot2)
+library(tidytext)
+```
+
+
+```{r get-data}
+if (!file.exists("mtsamples.csv"))
+  download.file(
+    url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/00_mtsamples/mtsamples.csv",
+    destfile = "mtsamples.csv",
+    method = "libcurl",
+    timeout = 60
+  )
+mtsamples <- read.csv("mtsamples.csv")
+mtsamples <- as_tibble(mtsamples)
+mtsamples
+```
+
+
+
+
+## Question 1: What specialties do we have?
+
+We can use count() from dplyr to figure out how many different catagories do we have? Are these catagories related? overlapping? evenly distributed?
+
+```{r dist-of-specialities}
+specialties <- mtsamples %>%
+  count(medical_specialty)
+
+specialties %>%
+  arrange(desc(n))%>%
+  top_n(15) %>%
+  knitr::kable()
+  
+```
+
+There are `r nrow(speclialties)' specialties. Let's take a look at the distrubution.
+```{r dist}
+ggplot(mtsamples, aes(x = medical_specialty)) +
+  geom_histogram(stat = "count") +
+  coord_flip()
+
+```
+```{r dist2}
+# method 2
+ggplot(specialties, aes(x = n, y = fct_reorder(medical_specialty, n))) +
+  geom_col()
+```
+
+There are not evenly ( uniformly) distribution.
+
+## Question 2
+
+```{r token-transcript,cache=TRUE}
+mtsamples %>% 
+  unnest_tokens(output = word, input = transcription) %>%
+  count(word, sort = TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(x=n, y = fct_reorder(word,n))) +
+    geom_col()
+```
+
+The word "patient" seems to be important, but we observe a lot of stopwords
+
+## Question 3
+```{r}
+
+```
+
+## Question 4
+```{r}
+
+```
+
+## Question 5
+```{r}
+
+```
+
+## Question 6
+```{r}
+
+```
+
+## Question 7
+```{r}
+
+```
