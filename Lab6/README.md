@@ -167,10 +167,91 @@ mtsamples %>%
 The word "patient" seems to be important, but we observe a lot of stopwords
 
 ## Question 3
+Redo visualization but remove stopwords before
+What do we see know that we have removed stop words? Does it give us a better idea of what the text is about?
+
+```r
+mtsamples %>% 
+  unnest_tokens(output = word, input = transcription) %>%
+  count(word, sort = TRUE) %>%
+  anti_join(stop_words, by = c("word")) %>%
+  top_n(20) %>%
+  ggplot(aes(x=n, y = fct_reorder(word,n))) +
+    geom_col()
+```
+
+```
+## Selecting by n
+```
+
+![](README_files/figure-html/token-transcript-wo-stop-1.png)<!-- -->
+
+Looking better ~~, but we don't like the numbers~~.
+
+Bonus points if you remove numbers as well
+
+```r
+# method 1
+tokens_clean <- mtsamples %>% 
+  unnest_tokens(output = word, input = transcription) %>%
+  count(word, sort = TRUE) %>%
+  anti_join(stop_words, by = c("word"))
+
+nums <- tokens_clean %>% filter(str_detect(word, "^[0-9]")) %>% select(word) %>% unique()
+
+tokens_clean %>% 
+  anti_join(nums, by = c("word")) %>%
+  top_n(20) %>%
+  ggplot(aes(x=n, y = fct_reorder(word,n))) +
+    geom_col()
+```
+
+```
+## Selecting by n
+```
+
+![](README_files/figure-html/token-transcript-num-1.png)<!-- -->
+
+```r
+# method 2
+mtsamples %>% 
+  unnest_tokens(output = word, input = transcription) %>%
+  count(word, sort = TRUE) %>%
+  anti_join(stop_words, by = c("word")) %>%
+  # using regular expressions to remove numbers
+  filter(!grepl(pattern = "^[0-9]+$", x = word)) %>%
+  top_n(20) %>%
+  ggplot(aes(x=n, y = fct_reorder(word,n))) +
+    geom_col()
+```
+
+```
+## Selecting by n
+```
+
+![](README_files/figure-html/token-transcript-num-2.png)<!-- -->
+
 
 
 ## Question 4
 
+repeat question 2, but this time tokenize into bi-grams. how does the result change if you look at tri-grams?
+
+
+```r
+mtsamples %>% 
+  unnest_ngrams(output = bigram, input = transcription, n = 2) %>%
+  count(bigram, sort = TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(x=n, y = fct_reorder(bigram,n))) +
+    geom_col()
+```
+
+```
+## Selecting by n
+```
+
+![](README_files/figure-html/bi-grams-transcript-1.png)<!-- -->
 
 ## Question 5
 
