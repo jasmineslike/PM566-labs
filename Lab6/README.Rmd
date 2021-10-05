@@ -61,7 +61,7 @@ specialties %>%
   
 ```
 
-There are `r nrow(speclialties)' specialties. Let's take a look at the distrubution.
+There are 40 specialties. Let's take a look at the distribution.
 ```{r dist}
 ggplot(mtsamples, aes(x = medical_specialty)) +
   geom_histogram(stat = "count") +
@@ -74,9 +74,12 @@ ggplot(specialties, aes(x = n, y = fct_reorder(medical_specialty, n))) +
   geom_col()
 ```
 
-There are not evenly ( uniformly) distribution.
+There are not evenly (uniformly) distribution. 
+There is no overlapping happen.
 
 ## Question 2
+
+Explain what we see from this result. Does it makes sense? What insights (if any) do we get?
 
 ```{r token-transcript,cache=TRUE}
 mtsamples %>% 
@@ -87,7 +90,7 @@ mtsamples %>%
     geom_col()
 ```
 
-The word "patient" seems to be important, but we observe a lot of stopwords
+The word "patient" seems to be important, but we observe a lot of stop words.
 
 ## Question 3
 Redo visualization but remove stopwords before
@@ -132,7 +135,7 @@ mtsamples %>%
     geom_col()
 
 ```
-
+Without the spotwords and number, we can see more relative words in the dataset.
 
 
 ## Question 4
@@ -148,7 +151,7 @@ mtsamples %>%
     geom_col()
 ```
 
-Using bi-grams is not very informative, Let's 
+Using bi-grams is not very informative, Let's try trigrams:
 
 ```{r tri-grams-transcript}
 mtsamples %>% 
@@ -162,16 +165,64 @@ mtsamples %>%
 Now some phrase start to show up, e.g., "tolerated the procedure", "prepped and draped".
 
 ## Question 5
-```{r}
 
+Using the results you got from questions 4. Pick a word and count the words that appears after and before it.
+
+Pick the word: Patient
+```{r history, cache = TRUE, warning=FALSE}
+bigrams <- mtsamples %>%
+  unnest_ngrams(output = bigram, input = transcription, n = 2) %>%
+  separate(bigram, into = c("w1", "w2"), sep = " ") %>%
+  filter((w1 == "patient") | (w2 == "patient"))
+bigrams %>%
+  filter(w1 == "patient") %>%
+  select(w1, w2) %>%
+  count(w2, sort = TRUE)
+bigrams %>%
+  filter(w2 == "patient") %>%
+  select(w1, w2) %>%
+  count(w1, sort = TRUE)
 ```
+
+Since we are looking at single words again, it is a good idea to treat these as
+single tokens. So let's remove the stopwords and the numbers
+
+```{r patient-wo-stop}
+bigrams %>%
+  filter(w1 == "patient") %>%
+  filter(!(w2 %in% stop_words$word) & !grepl("^[0-9]+$", w2)) %>%
+  count(w2, sort = TRUE) %>%
+  top_n(10) %>%
+  knitr::kable(caption = "Words AFTER 'patient'")
+bigrams %>%
+  filter(w2 == "patient") %>%
+  filter(!(w1 %in% stop_words$word) & !grepl("^[0-9]+$", w1)) %>%
+  count(w1, sort = TRUE) %>%
+  top_n(10) %>%
+  knitr::kable(caption = "Words BEFORE 'patient'")
+```
+
+
 
 ## Question 6
-```{r}
 
+Which words are most used in each of the specialties. you can use group_by() and top_n() from dplyr to have the calculations be done within each specialty. Remember to remove stopwords. How about the most 5 used words?
+
+```{r}
+mtsamples %>% 
+  unnest_tokens(output = word, input = transcription) %>%
+  group_by(medical_specialty) %>%
+  count(word, sort = TRUE) %>%
+  filter(!(word %in% stop_words$word) & !grepl("^[0-9]+$", word)) %>%
+  top_n(5) %>%
+  arrange(medical_specialty, desc(n)) %>%
+  knitr::kable()
 ```
+
+The table shown above is top 5 word per medical specialty. But if there exist ties, like Allergy / Immunology, which contains different words but same times, it also will show up.
 
 ## Question 7
-```{r}
 
-```
+Find your own insight in the data:
+
+According to the Question 6,It is not surprisingly to see that all categories contains *patient*. Some top words also contains the *left*, *history*. And at the same time we can clearly observe that the top 5 words in each category can directly explain what this category mean, or what the specific function of this category is, for example: *Bariatrics --- gastric*, *Cardiovascular / Pulmonary --- coronary and artery*. As some not professional persons, they cannot directly understand the medical words, these top words which can easily to show normal people which category is.
