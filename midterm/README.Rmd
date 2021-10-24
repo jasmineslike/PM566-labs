@@ -1,0 +1,236 @@
+---
+title: "COVID-19's relationship with Race"
+author: "Lili Xu"
+date: "10/22/2021"
+output: 
+    html_document:
+      toc: yes 
+      toc_float: yes 
+      highlight: haddock
+      theme: cosmo
+      keep_md: yes
+    github_document:
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringr)
+library(tidyverse)
+library(data.table)
+library(dplyr)
+```
+
+```{r html_code, include=FALSE} 
+if (knitr::is_html_output(excludes = "gfm")) {
+  
+}
+```
+#  Introduction
+
+The COVID-19 pandemic not only affects the global economy, but also seriously affects people's health and lifestyle. According to the current official data, we can observe the relevant factors of the COVID-19 to make better policies. For this project, we will analysis the data in United States.
+
+## Question: Is race related to the death rate of COVID-19?
+  - The histogram of deaths with different races in United States(count the deaths - different races in USA)
+  - COVID-19's death rate of different races in California(death rate - date in CA)
+  - The highest death rate of each state in United States(death rate - States in USA)
+
+
+# Methods
+## Data Source
+The COVID Tracking Project is a volunteer organization launched from The Atlantic and dedicated to collecting and publishing the data required to understand the COVID-19 outbreak in the United States. 
+The data used for this project is: [Race & Ethnicity](https://covidtracking.com/race)
+```{r download}
+data <- fread("CRDT Data - CRDT.csv")
+```
+
+## Cleaned and Wrangled Data
+
+As an analysist, the first step is dealing with the dirty data. Here, check the structure and NAs first.
+```{r clean, results="hide", message=FALSE}
+dim(data)
+str(data)
+# check NAs
+summary(data$Cases_Total)
+summary(data$Cases_White)
+summary(data$Cases_Black)
+summary(data$Cases_Latinx)
+summary(data$Cases_Asian)
+summary(data$Cases_AIAN)
+summary(data$Cases_NHPI)
+summary(data$Cases_Multiracial)
+summary(data$Deaths_Total)
+summary(data$Deaths_White)
+summary(data$Deaths_Black)
+summary(data$Deaths_Latinx)
+summary(data$Deaths_Asian)
+summary(data$Deaths_AIAN)
+summary(data$Deaths_NHPI)
+summary(data$Deaths_Multiracial)
+
+```
+
+    * There are 5320 rows and 54 columns in the CRDT dataset. Inside the dataset, the columns that we will use in the project are Total, White, Black, Latinx, Asian, AIAN(American Indian or Alaska Native), NHPI(Native Hawaiian or Other Pacific Islander), Multiracial. And these columns both have cases and deaths.
+
+    * Within the summary, this dataset contains huge NA values which should be dropped. Especially, Latinx, AIAN, NHPI, and Multiracial have most NA values. 
+
+Next, select the columns to create new data frame which will be easier use for analyzing. 
+
+```{r newDF, results="hide", message=FALSE}
+
+# create new data frame without NA
+race <- select(data, c('Date', 'State','Cases_Total', 'Cases_White', 'Cases_Black', 'Cases_Latinx', 'Cases_Asian', 'Cases_AIAN', 'Cases_NHPI', 'Cases_Multiracial',
+                       'Deaths_Total', 'Deaths_White', 'Deaths_Black', 'Deaths_Latinx', 'Deaths_Asian', 'Deaths_AIAN', 'Deaths_NHPI', 'Deaths_Multiracial'))
+# drop NAs
+race <- race[!is.na(Cases_Total) & !is.na(Cases_White) & !is.na(Cases_Black) & !is.na(Cases_Latinx) & !is.na(Cases_Asian) & !is.na(Cases_AIAN) & !is.na(Cases_NHPI) & !is.na(Cases_Multiracial) & !is.na(Deaths_Total) & !is.na(Deaths_White) & !is.na(Deaths_Black) & !is.na(Deaths_Latinx) & !is.na(Deaths_Asian) & !is.na(Deaths_AIAN) & !is.na(Deaths_NHPI) & !is.na(Deaths_Multiracial)]
+
+race$Date = as.Date(as.character(race$Date),"%Y%m%d")
+
+# calculate the death rate of each race by date and state
+race[, DRate_Total := Deaths_Total/Cases_Total*100]
+race[, DRate_White := Deaths_White/Cases_White*100]
+race[, DRate_Black := Deaths_Black/Cases_Black*100]
+race[, DRate_Latinx := Deaths_Latinx/Cases_Latinx*100]
+race[, DRate_Asian := Deaths_Asian/Cases_Asian*100]
+race[, DRate_AIAN := Deaths_AIAN/Cases_AIAN*100]
+race[, DRate_NHPI := Deaths_NHPI/Cases_NHPI*100]
+race[, DRate_Multiracial := Deaths_Multiracial/Cases_Multiracial*100]
+sum(is.na(race))
+race[is.na(race)] <- 0
+sum(is.na(race))
+
+# create new data frame for total death
+race_deaths <- race[,.(
+  Total = sum(Deaths_Total),
+  White = sum(Deaths_White),
+  Black = sum(Deaths_Black),
+  Latinx = sum(Deaths_Latinx),
+  Asian = sum(Deaths_Asian),
+  AIAN = sum(Deaths_AIAN),
+  NHPI = sum(Deaths_NHPI),
+  Multiracial = sum(Deaths_Multiracial)
+), by = State]
+
+# create new data frame for death rate
+Daily_rate <- race[,.(
+  Date = Date,
+  State = State,
+  Total = DRate_Total,
+  White = DRate_White,
+  Black = DRate_Black,
+  Latinx = DRate_Latinx,
+  Asian = DRate_Asian,
+  AIAN = DRate_AIAN,
+  NHPI = DRate_NHPI,
+  Multiracial = DRate_Multiracial
+)]
+
+```
+
+    * After selecting Columns and droping NAs, we need to convert the Date format to yyyy-mm-dd which will better use in graph.
+    
+    * race dataset: 'Date', 'State','Cases_Total', 'Cases_White', 'Cases_Black', 'Cases_Latinx', 'Cases_Asian', 'Cases_AIAN', 'Cases_NHPI', 'Cases_Multiracial', 'Deaths_Total', 'Deaths_White', 'Deaths_Black', 'Deaths_Latinx', 'Deaths_Asian', 'Deaths_AIAN', 'Deaths_NHPI', 'Deaths_Multiracial'
+        - calculate death rate of each races
+        - replace NAN to 0: because 0 cannot devided by 0
+        
+    * race_death: State, Total, White, Black, Latinx, Asian, AIAN, NHPI, Multriracial
+        - sum of the deaths of each race, category by State
+        
+    * Daily_rate: Date, State, Total, White, Black, Latinx, Asian, AIAN, NHPI, Multriracial
+        - the death rate of each race by Date and State
+        
+
+# Preliminary Results
+
+## The Barchat of deaths with different races in United States
+```{r histrogram, warning=FALSE}
+convertRace = melt(race_deaths, id.vars = "State")
+
+convertRace %>%
+  ggplot(aes(x = variable, y = value, fill = variable)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Barchart of COVID-19's Deaths by Race in United State", x="Race",y=" Death Count") +
+  scale_fill_viridis_d()
+```
+
+    * Beside Total deaths, the White race is the largest which above 1000000, and the Latinx is the second largest death counts. in the contrast, Black are not the one with the highest number of deaths.
+
+## COVID-19's death rate tendency of different races in California
+```{r california, warning=FALSE}
+
+Daily_rate[State == "CA"] %>%
+  ggplot()+
+  geom_point(aes(x =  Date, y = Total, color = "Total"))+
+  geom_point(aes(x =  Date, y = White, color = "White"))+
+  geom_point(aes(x =  Date, y = Black, color = "Black"))+
+  geom_point(aes(x =  Date, y = Latinx, color = "Latinx"))+
+  geom_point(aes(x =  Date, y = Asian, color = "Asian"))+
+  geom_point(aes(x =  Date, y = AIAN, color = "AIAN"))+
+  geom_point(aes(x =  Date, y = NHPI, color = "NHPI"))+
+  geom_point(aes(x =  Date, y = Multiracial, color = "Multiracial"))+
+  labs(title = "The Tendency of COVID-19's Death Rate by Race in California", x="Race",y=" Death Rate(%)")+
+  ylim(0,15)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))+
+  scale_x_date(date_breaks = "months" , date_labels = "%b-%y")
+  
+```
+
+    * The tendency of death rate gradually decresed by the Date. Before 2020-7-20, the death rate of all races is high, especially, AIAN(the highest death rate daily). After 2020-7-20, all races have similiar line sharp which means people pay more attention to health, thereby reducing the rate of COVID-19 infections.
+    
+    * Within this graph, the death rate of Black is more higher than other races, after 2020-7-20, Asian have the highest death rate, but there is no big dofference. 
+    
+    * Compare with NHPI,Latinx and Multiracial, the death rate of Blacks, whites, AIAN and Asians are the four races with the highest death rates.
+    
+    * Because the contains other races, the total death rate is not too high, maybe caused by data losing.
+## The highest death rate of each state in United States
+```{r hignestRate,warning=FALSE}
+data[is.na(data)] <- 0
+sum(is.na(data))
+data_state <- data[,.(
+  Total = sum(Deaths_Total),
+  White = sum(Deaths_White),
+  Black = sum(Deaths_Black),
+  Latinx = sum(Deaths_Latinx),
+  Asian = sum(Deaths_Asian),
+  AIAN = sum(Deaths_AIAN),
+  NHPI = sum(Deaths_NHPI),
+  Multiracial = sum(Deaths_Multiracial)
+), by = State]
+
+data_state <- data[,.(
+  Total = sum(Deaths_Total)/sum(Cases_Total)*100,
+  White = sum(Deaths_White)/sum(Cases_White)*100,
+  Black = sum(Deaths_Black)/sum(Cases_Black)*100,
+  Latinx = sum(Deaths_Latinx)/sum(Cases_Latinx)*100,
+  Asian = sum(Deaths_Asian)/sum(Cases_Asian)*100,
+  AIAN = sum(Deaths_AIAN)/sum(Cases_AIAN)*100,
+  NHPI = sum(Deaths_NHPI)/sum(Cases_NHPI)*100,
+  Multiracial = sum(Deaths_Multiracial)/sum(Cases_Multiracial)*100
+), by = State]
+
+data_state[is.na(data_state)] <- 0
+
+maxRate <- colnames(data_state)[apply(data_state,1,which.max)]
+data_state$MaxRate <- maxRate
+
+knitr::kable(data_state)
+
+
+max_Race <- data_state %>%
+  count(MaxRate)
+
+max_Race %>%
+  arrange(desc(n))%>%
+  knitr::kable()
+```
+
+    * the First table shows the death rate of different races in each state, and which race has the highest death rate.
+    
+    * the second table summarizes the races have the number of states with the highest death rate:
+      - White have the highest number which means White people maybe have huge risk in United States.
+      
+# Conclusion
+
+With preliminary results above:
+
+    I think there is no obvious correlation between race and COVID-19. From "Barchart of COVID-19's Deaths by Race in United State", White and Latinx are the highest, and Black is less than Asian. However, looking at "The Tendency of COVID-19's Death Rate by Race in California", Black and Asian have high death rates, while White have a slightly less number. Maybe the data collection is not complete in other states, so the result is comflict. The Total death rate is much lower. There may be a lot of information about other races but not fully included in the dataset. To be honest, I think the main reason for the difference of death rates among different races is the inadequacy of protective measures and unfairness. First of all, the main population of the United States is white. Because of the large base, the case and death rates are higher than those of other races, but the living distribution of other races is different. For example, in California, the death rate of Black is higher than that of White: one is because Black live here concentratedly, and the other is because of the large burden of medical resources that cannot support the population of California and the uneven distribution of resources. Why the death rate of white people is high? Another possible guess is that many white people oppose wearing masks and feel that it hinders their freedom, but this will also lead to an increase in their death rate. According to the "The Tendency of COVID-19's Death Rate by Race in California", with the time passed, medical resources may increase and the concept of protection increases, and the death rate of each race has decreased, showing almost same trend, which verifies that there is no correlation between Race and COVID-19.
