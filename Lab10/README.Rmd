@@ -1,0 +1,331 @@
+---
+title: "Lab 10"
+author: "Lili Xu"
+date: "11/5/2021"
+output: 
+    html_document:
+      html_preview: false
+      keep_md: yes
+    github_document:
+always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## Setup
+
+```{r set-up}
+# install.packages(c("RSQLite", "DBI"))
+
+library(RSQLite)
+library(DBI)
+library(dplyr)
+
+# Initialize a temporary in memory database
+con <- dbConnect(SQLite(), ":memory:")
+
+# Download tables
+actor <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/actor.csv")
+rental <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/rental.csv")
+customer <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/customer.csv")
+payment <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/payment_p2007_01.csv")
+
+# Copy data.frames to database
+dbWriteTable(con, "actor", actor)
+dbWriteTable(con, "rental", rental)
+dbWriteTable(con, "customer", customer)
+dbWriteTable(con, "payment", payment)
+```
+
+
+Are the tables there?
+
+```{r check-tables}
+dbListTables(con)
+```
+
+You can also use knitr + SQL!
+
+TIP: Use can use the following QUERY to see the structure of a table
+```{sql, connection = con, output.var = "x1"}
+PRAGMA table_info(actor)
+```
+
+
+This is equivalent to use `dbGetQuery`
+
+#### Actor
+```{r check-actor}
+dbGetQuery(con, "PRAGMA table_info(actor)") %>%
+  knitr::kable()
+```
+
+#### Customer
+```{r check-customer}
+dbGetQuery(con, "PRAGMA table_info(customer)")　%>%
+  knitr::kable()
+```
+
+#### Rental
+```{r check-rental}
+dbGetQuery(con, "PRAGMA table_info(rental)") %>%
+  knitr::kable()
+```
+
+#### Payment
+```{r check-payment}
+dbGetQuery(con, "PRAGMA table_info(payment)") %>%
+  knitr::kable()
+```
+
+## Exercise 1
+Retrive the actor ID, first name and last name for all actors using the actor table. Sort by last name and then by first name.
+
+And using the LIMIT clause (`head()` in R ) to just show the first 5
+
+```{r exercise1}
+dbGetQuery(con, "
+/* This is COMMENT! */
+SELECT actor_id, first_name, last_name
+FROM actor /* YOU CAN ADD COMMENTS USING
+MULTIPLE LINES! */
+ORDER by last_name, first_name 
+LIMIT 5") %>%
+  knitr::kable()
+
+```
+
+## Exercise 2
+Retrive the actor ID, first name, and last name for actors whose last name equals ‘WILLIAMS’ or ‘DAVIS’.
+
+```{r exercise2}
+
+dbGetQuery(con, "
+SELECT actor_id, first_name, last_name
+FROM actor
+WHERE last_name IN ('WILLIAMS', 'DAVIS')
+LIMIT 5") %>%
+  knitr::kable()
+```
+
+
+## Exercise 3
+Write a query against the rental table that returns the IDs of the customers who rented a film on July 5, 2005 (use the rental.rental_date column, and you can use the date() function to ignore the time component). Include a single row for each distinct customer ID.
+
+
+```{r exercise3}
+
+dbGetQuery(con, "
+SELECT DISTINCT customer_id
+FROM rental
+WHERE date(rental_date) = '2005-07-05'
+LIMIT 5") %>%
+  knitr::kable()
+
+```
+
+
+## Exercise 4
+
+
+### Exercise 4.1
+Construct a query that retrives all rows from the payment table where the amount is either 1.99, 7.99, 9.99.
+```{r exercise4.1}
+
+q <- dbSendQuery(con, "
+SELECT *
+FROM payment
+WHERE amount IN (1.99, 7.99, 9.99)")
+
+dbFetch(q , n = 10) %>%
+  knitr::kable()
+
+dbClearResult(q) 
+```
+
+
+### Exercise 4.2
+Construct a query that retrives all rows from the `payment` table where the amount is greater then 5
+
+```{r exercise4.2}
+dbGetQuery(con, "
+SELECT *
+FROM payment
+WHERE amount > 5
+LIMIT 5") %>%
+  knitr::kable()
+```
+
+#### Bouns: Count how many are
+
+```{r bouns-count}
+dbGetQuery(con, "
+SELECT COUNT(*)
+FROM payment
+WHERE amount > 5") %>%
+  knitr::kable()
+```
+
+Counting per `staff_id`
+
+```{r Bouns-count-staff}
+dbGetQuery(con, "
+SELECT staff_id, COUNT(*) AS N
+FROM payment
+WHERE amount > 5
+GROUP BY staff_id") %>%
+  knitr::kable()
+```
+
+### Exercise 4.3
+Construct a query that retrives all rows from the payment table where the amount is greater then 5 and less then 8
+
+```{r exercise4.3}
+
+dbGetQuery(con, "
+SELECT *
+FROM payment
+WHERE amount > 5 AND amount < 8
+LIMIT 5") %>%
+  knitr::kable()
+
+```
+
+
+## Exercise 5
+Retrive all the payment IDs and their amount from the customers whose last name is ‘DAVIS’.
+
+
+```{r exercise5}
+dbGetQuery(con, "
+SELECT payment.payment_id, payment.amount
+FROM payment
+  INNER JOIN customer ON payment.customer_id = customer.customer_id
+WHERE customer.last_name = 'DAVIS'") %>%
+  knitr::kable()
+
+```
+
+
+
+## Exercise 6
+
+
+### Exercise 6.1
+Use COUNT(*) to count the number of rows in rental
+
+```{r exercise6.1}
+dbGetQuery(con, "
+SELECT COUNT(*) as Total_Rentals
+FROM rental") %>%
+  knitr::kable()
+```
+
+
+### Exercise 6.2
+Use COUNT(*) and GROUP BY to count the number of rentals for each customer_id
+
+```{r exercise6.2}
+dbGetQuery(con, "
+SELECT customer_id, COUNT(*) AS 'N Rentals'
+FROM rental
+GROUP BY customer_id
+LIMIT 10") %>%
+  knitr::kable()
+```
+
+
+### Exercise 6.3
+Repeat the previous query and sort by the count in descending order
+
+```{r exercise6.3}
+dbGetQuery(con, "
+SELECT customer_id, COUNT(*) AS 'N Rentals'
+FROM rental
+GROUP BY customer_id
+ORDER BY `N Rentals` DESC
+LIMIT 10") %>%
+  knitr::kable()
+```
+
+
+
+### Exercise 6.4
+Repeat the previous query but use HAVING to only keep the groups with 40 or more.
+
+```{r exercise6.4}
+dbGetQuery(con, "
+SELECT customer_id, COUNT(*) AS 'N Rentals'
+FROM rental
+GROUP BY customer_id
+HAVING `N Rentals` >= 40
+ORDER BY `N Rentals` DESC") %>%
+  knitr::kable()
+```
+
+
+## Exercise 7
+
+The following query calculates a number of summary statistics for the payment table using MAX, MIN, AVG and SUM
+
+```{r exercise7}
+
+dbGetQuery(con, "
+SELECT 
+  MAX(amount) AS Max, 
+  MIN(amount) AS Min, 
+  AVG(amount) AS Avg, 
+  SUM(amount) AS Sum
+FROM payment") %>%
+  knitr::kable()
+
+```
+
+
+### Exercise 7.1
+Modify the above query to do those calculations for each customer_id
+
+```{r exercise7.1}
+dbGetQuery(con, "
+SELECT 
+  customer_id, 
+  MAX(amount) AS Max, 
+  MIN(amount) AS Min,
+  AVG(amount) AS Avg, 
+  SUM(amount) AS Sum
+FROM payment
+GROUP BY customer_id
+LIMIT 10") %>%
+  knitr::kable()
+```
+
+
+
+### Exercise 7.2
+Modify the above query to only keep the customer_ids that have more then 5 payments
+
+```{r exercise7.2}
+dbGetQuery(con, "
+SELECT 
+  customer_id, 
+  MAX(amount) AS Max, 
+  MIN(amount) AS Min,
+  AVG(amount) AS Avg, 
+  SUM(amount) AS Sum
+FROM payment
+GROUP BY customer_id
+HAVING COUNT(customer_id) > 5") %>%
+  knitr::kable()
+```
+
+
+
+## Clean up
+Run the following chunk to disconnect from the connection.
+```{r}
+# clean up
+dbDisconnect(con)
+```
+
